@@ -1,5 +1,5 @@
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_s3::config::{Credentials, SharedCredentialsProvider};
+use aws_sdk_s3::config::{Credentials, SharedCredentialsProvider, Builder};
 use aws_config::{BehaviorVersion, Region};
 
 
@@ -12,7 +12,8 @@ pub async fn get_s3_client() -> S3Client {
         .credentials_provider(creds_provider)
         .region(Region::new("us-east-1"))
         .build();
-    S3Client::new(&config)
+    let s3_config = Builder::from(&config).force_path_style(true).build();
+    S3Client::from_conf(s3_config)
 }
 
 pub async fn create_bucket(
