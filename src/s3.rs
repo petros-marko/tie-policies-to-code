@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_s3::config::{Credentials, SharedCredentialsProvider, Builder};
 use aws_config::{BehaviorVersion, Region};
@@ -63,14 +65,25 @@ pub async fn download_object(
     client: &aws_sdk_s3::Client,
     bucket_name: &str,
     key: &str,
-) -> Result<aws_sdk_s3::operation::get_object::GetObjectOutput, aws_sdk_s3::Error> {
-    client
+) -> Result<(), Box<dyn std::error::Error>> {
+    let object = client
         .get_object()
         .bucket(bucket_name)
         .key(key)
         .send()
         .await
-        .map_err(aws_sdk_s3::Error::from)
+        .map_err(aws_sdk_s3::Error::from)?;
+
+    // write file to ./output
+    tokio::fs::create_dir_all("./s3_output").await?;
+    let output_path = PathBuf::from("./s3_output").join(key);
+    let mut file = tokio::fs::File::create(&output_path).await?;
+    let mut body = object.body.into_async_read();
+    tokio::io::copy(&mut body, &mut file).await?;
+
+    println!("Downloaded to: {}", output_path.display());
+
+    return Ok(())
 }
 
 pub async fn list_objects(client: &aws_sdk_s3::Client, bucket: &str) -> Result<(), aws_sdk_s3::Error> {

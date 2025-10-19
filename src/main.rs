@@ -53,6 +53,14 @@ async fn main() -> Result<(), io::Error> {
                     println!("download_object requires 2 arguments");
                 }
             },
+            "list_objects" => {
+                if cmd.len() == 2 {
+                    let bucket_name = cmd[1]; 
+                    s3::list_objects(&client, bucket_name).await.unwrap();
+                } else {
+                    println!("list_objects requires 1 argument");
+                }  
+            },
             "quit" => { break; },
             _ => println!(
                 "Commands: 
