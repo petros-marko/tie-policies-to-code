@@ -5,6 +5,7 @@ use std::io::{Write};
 use std::path::Path;
 use syn::{parse_macro_input, ItemFn};
 
+mod parser;
 mod policy;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

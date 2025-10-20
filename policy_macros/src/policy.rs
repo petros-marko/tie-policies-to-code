@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use syn::{parse::{Parse, ParseStream}, Ident};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum Effect {
@@ -16,14 +15,6 @@ impl FromStr for Effect {
             "deny" => Ok(Effect::Deny),
             s => Err(format!("Invalid effect: {}", s)),
         }
-    }
-}
-
-impl Parse for Effect {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let ident: Ident = input.parse()?;
-        Effect::from_str(&ident.to_string())
-            .map_err(|err| syn::Error::new(ident.span(), err))
     }
 }
 
@@ -48,14 +39,6 @@ impl FromStr for Action {
     }
 }
 
-impl Parse for Action {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let ident: Ident = input.parse()?;
-        Action::from_str(&ident.to_string())
-            .map_err(|err| syn::Error::new(ident.span(), err))
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Policy {
     effect: Effect,
@@ -63,16 +46,13 @@ pub struct Policy {
     resource: String,
 }
 
-impl Parse for Policy {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let effect = input.parse::<Effect>()?;
-        let action = input.parse::<Action>()?;
-        let resource = input.parse::<Ident>()?;
-        Ok(Policy {
+impl Policy {
+    pub fn new(effect: Effect, action: Action, resource: String) -> Self {
+        Self {
             effect,
             action,
-            resource: resource.to_string(),
-        })
+            resource
+        }
     }
 }
 
