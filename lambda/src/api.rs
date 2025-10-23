@@ -29,7 +29,7 @@ impl RestApiGateway {
         let api_client = ApiGatewayClient::new(&config);
         let result = api_client
             .create_rest_api()
-            .name("michcat-api-name-new")
+            .name("my-new-api")
             .send()
             .await?;
 
@@ -119,57 +119,6 @@ impl RestApiGateway {
 
         println!("Status: {}", response.status());
         println!("Body: {}", response.text().await?);
-
-        // let endpoint_url = format!(
-        //     "http://localhost:4566/restapis/{}/{}/_user_request_/{}",
-        //     self.api_id, self.stage_name, endpoint
-        // );
-
-        // println!("endopint is {}", endpoint_url);
-
-        // let client = reqwest::Client::new();
-        // let response = client.get(&endpoint_url).json(&example_json).send().await?;
-
-        // let status = response.status();
-        // let body = response.text().await?;
-
-        // println!("Response Status: {}", status);
-        // println!("Response Body: {}", body);
-
-        // let payload = fs::read_to_string("example.json")
-        // .expect("Failed to read example.json");
-
-        // // Configure AWS SDK to use LocalStack endpoint
-        // let region_provider = RegionProviderChain::default_provider().or_else("us-east-1");
-        // let config = aws_config::from_env()
-        //     .region(region_provider)
-        //     .endpoint_url("http://localhost:4566")
-        //     .load()
-        //     .await;
-
-        // let client = Client::new(&config);
-
-        // // Invoke the Lambda function
-        // let resp = client
-        //     .invoke()
-        //     .function_name("michelina4") // Replace with your function name
-        //     .payload(Blob::new(payload.as_bytes()))
-        //     .send()
-        //     .await?;
-
-        // // Handle the response
-        // if let Some(payload) = resp.payload() {
-        //     let response_str = String::from_utf8_lossy(payload.as_ref());
-        //     println!("Response: {}", response_str);
-        // }
-
-        // // if let Some(status_code) = resp.status_code() {
-        // //     println!("Status code: {}", status_code);
-        // // }
-
-        // if let Some(function_error) = resp.function_error() {
-        //     eprintln!("Function error: {}", function_error);
-        // }
 
         Ok(())
     }
