@@ -3,63 +3,75 @@ mod lambda;
 
 use std::path::Path;
 use std::{env, io};
-
-use crate::lambda::LambdaClient;
+use std::thread;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), io::Error> {
-    let mut args = env::args().skip(1); // Skip program name
+    let account_id = "000000000000";
+    let handler = "lambda_function.lambda_handler";
+    let rolename = "test-rolename";
+    let http_method = "GET";
 
-    let file_path = match args.next() {
-        Some(path) => path,
+    let mut args = env::args().skip(1); // skip program name
+
+    let filepath = match args.next() {
+        Some(f) => f,
         None => {
-            eprintln!("Usage: your_program <path_to_file> <name_of_func>");
+            eprintln!("Usage: cargo run <path_to_zipped_code> <name_of_func> <path>");
             std::process::exit(1);
         }
     };
 
     let function_name = match args.next() {
-        Some(path) => path,
+        Some(n) => n,
         None => {
-            eprintln!("Usage: your_program <path_to_file> <name_of_func>");
+            eprintln!("Usage: cargo run <path_to_zipped_code> <name_of_func> <path>");
             std::process::exit(1);
         }
     };
 
-    let zip_path = Path::new(&file_path);
-    let handler = "lambda_function.lambda_handler";
-    let account_id = "000000000000";
+     let path = match args.next() {
+        Some(p) => p,
+        None => {
+            eprintln!("Usage: cargo run <path_to_zipped_code> <name_of_func> <path>");
+            std::process::exit(1);
+        }
+    };
 
-    // Create AWS clients
+    // to create a zip of some rust project binary: 'cargo lambda build --output-format=zip' 
+    // output is in target/lambda/your_project/bootstrap.zip
+    // more info here: https://www.cargo-lambda.info/guide/getting-started.html
+    let zip_path = Path::new(&filepath);
+
     let rest_api = api::RestApiGateway::new().await.expect("aws api gateway");
-    let lambda_client = LambdaClient::new().await.expect("aws lambda client");
+    let lambda_client = lambda::LambdaClient::new().await.expect("aws lambda client");
 
-    // Deploy/update Lambda function
+    // Deploy Lambda function (or update if function already exists) 
     let function_arn = lambda_client
-        .deploy_fn("test-rolename", &function_name, zip_path, handler)
+        .deploy_fn(rolename, &function_name, &zip_path, &handler)
         .await
         .expect("deploy lambda");
 
     // Create endpoint
     rest_api
-        .create_endpoint("test_func", "GET", &function_arn)
+        .create_endpoint(&path, &http_method, &function_arn)
         .await
         .expect("create endpoint");
 
-    // Add Lambda permission for API Gateway to invoke
+    // Add permission for API Gateway to invoke Lambda
     lambda_client
         .add_lambda_permission_to_gateway(&function_name, rest_api.api_id(), account_id)
         .await
         .expect("add lambda permission");
 
-    rest_api
-        .print_api_endpoints()
-        .await
-        .expect("print endpoints");
+    println!("Sleeping for 2 seconds so function definitely moves out of Pending state");
+    thread::sleep(Duration::from_secs(2));
+    println!("Finished sleeping");
 
     // test that it worked
     rest_api
-        .http_get("test_func")
+        .http_get(&path)
         .await
         .expect("test invoke endpoint");
 
