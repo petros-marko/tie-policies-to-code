@@ -1,8 +1,8 @@
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_iam::Client as AwsIamClient;
-use aws_sdk_lambda::Client as AwsLambdaClient;
 use aws_sdk_lambda::config::Builder as LambdaBuilder;
-use aws_sdk_lambda::types::{FunctionCode, Runtime};
+use aws_sdk_lambda::types::{Environment, FunctionCode, Runtime};
+use aws_sdk_lambda::Client as AwsLambdaClient;
 use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::config::SharedCredentialsProvider;
 
@@ -39,7 +39,6 @@ impl LambdaClient {
         role_name: &str,
         function_name: &str,
         zipped_code_path: &std::path::Path,
-        handler: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let role_arn = self.create_or_get_lambda_role(role_name).await?;
 
@@ -53,15 +52,38 @@ impl LambdaClient {
             .create_function()
             .function_name(function_name)
             .role(role_arn)
-            .handler(handler)
-            .runtime(Runtime::Python39)
+            .handler("bootstrap")
+            .timeout(30)
+            .runtime(Runtime::Providedal2023)
             .code(code)
+            .environment(
+                Environment::builder()
+                    .variables("AWS_LAMBDA_LOG_LEVEL", "DEBUG")
+                    .build(),
+            )
             .send()
-            .await?;
+            .await;
 
-        let function_arn = create_function_result.function_arn().unwrap_or_default();
+        let function_arn = match create_function_result {
+            Ok(res) => res.function_arn().map(|s| s.to_string()),
+            Err(err) => {
+                let service_err = err.into_service_error();
+                if !service_err.is_resource_conflict_exception() {
+                    return Err(service_err.into());
+                }
+                println!("Function with given name already deployed, nothing to do");
+                self.lambda_client
+                    .get_function()
+                    .function_name(function_name)
+                    .send()
+                    .await?
+                    .configuration()
+                    .and_then(|r| r.function_arn())
+                    .and_then(|r| Some(r.to_string()))
+            }
+        };
 
-        Ok(function_arn.to_string())
+        function_arn.ok_or_else(|| "Failed to get function ARN".into())
     }
 
     async fn create_or_get_lambda_role(
@@ -149,4 +171,3 @@ impl LambdaClient {
         Ok(())
     }
 }
-

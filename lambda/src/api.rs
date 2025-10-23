@@ -1,9 +1,10 @@
 use aws_config::{BehaviorVersion, Region};
-use aws_sdk_apigateway::Client as ApiGatewayClient;
 use aws_sdk_apigateway::types::IntegrationType;
+use aws_sdk_apigateway::Client as ApiGatewayClient;
 use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::config::SharedCredentialsProvider;
 use aws_sdk_s3::error::BoxError;
+use reqwest::Client as HTTPClient;
 
 pub struct RestApiGateway {
     api_client: aws_sdk_apigateway::Client,
@@ -28,7 +29,7 @@ impl RestApiGateway {
         let api_client = ApiGatewayClient::new(&config);
         let result = api_client
             .create_rest_api()
-            .name("michcat-api-name")
+            .name("my-new-api")
             .send()
             .await?;
 
@@ -100,19 +101,23 @@ impl RestApiGateway {
 
     // get 'endpoint'
     pub async fn http_get(&self, endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let endpoint_url = format!(
-            "http://localhost:4566/restapis/{}/{}/_user_request_/{}",
-            self.api_id, self.stage_name, endpoint
+        let client = HTTPClient::new();
+
+        let url = format!(
+            "http://localhost:4566/restapis/{}/$default/_user_request_/{}",
+            self.api_id, endpoint
         );
 
-        let client = reqwest::Client::new();
-        let response = client.get(&endpoint_url).send().await?;
+        let response = client
+            .get(url)
+            .query(&[("name", "tie-policies-to-code")]) 
+            .header("Content-Type", "application/json")
+            .header("headerName", "headerValue")
+            .send()
+            .await?;
 
-        let status = response.status();
-        let body = response.text().await?;
-
-        println!("Response Status: {}", status);
-        println!("Response Body: {}", body);
+        println!("Status: {}", response.status());
+        println!("Body: {}", response.text().await?);
 
         Ok(())
     }
