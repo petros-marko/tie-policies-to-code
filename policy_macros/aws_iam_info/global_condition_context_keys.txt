@@ -1,0 +1,66 @@
+Properties of the Principal:
+aws:PrincipalArn
+aws:PrincipalAccount
+aws:PrincipalOrgPaths
+aws:PrincipalOrgID
+aws:PrincipalTag/tag-key
+aws:PrincipalIsAWSService
+aws:PrincipalServiceName
+aws:PrincipalServiceNamesList
+aws:PrincipalType
+aws:userid
+aws:username
+
+Properties of a Role Session:
+aws:AssumedRoot
+aws:FederatedProvider
+aws:TokenIssueTime
+aws:MultiFactorAuthAge
+aws:MultiFactorAuthPresent
+aws:ChatbotSourceArn
+aws:Ec2InstanceSourceVpc
+aws:Ec2InstanceSourcePrivateIPv4
+aws:SourceIdentity
+ec2:RoleDelivery
+ec2:SourceInstanceArn
+glue:RoleAssumedBy
+glue:CredentialIssuingService
+lambda:SourceFunctionArn
+ssm:SourceInstanceArn
+identitystore:UserId
+
+Properties of the Network:
+aws:SourceIp
+aws:SourceVpc
+aws:SourceVpce
+aws:VpceAccount
+aws:VpceOrgID
+aws:VpceOrgPaths
+aws:VpcSourceIp
+
+Properties of the Resource:
+aws:ResourceAccount
+aws:ResourceOrgPaths
+aws:ResourceOrgID
+aws:ResourceTag/tag-key
+
+Properties of the Request:
+aws:CalledVia
+aws:CalledViaFirst
+aws:CalledViaLast
+aws:ViaAWSService
+aws:CurrentTime
+aws:EpochTime
+aws:referer - provided by the caller in an HTTP header
+aws:RequestedRegion - This key is always included in the request context.
+aws:RequestTag/tag-key
+aws:TagKeys
+aws:SecureTransport
+aws:SourceAccount
+aws:SourceArn
+aws:SourceOrgID
+aws:SourceOrgPaths
+aws:UserAgent
+
+And then there are s3 specific global conditions:
+https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazons3.html#amazons3-actions-as-permissions

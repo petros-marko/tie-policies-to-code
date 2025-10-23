@@ -6,6 +6,10 @@ use std::{env, io};
 use std::thread;
 use std::time::Duration;
 
+// next todos:
+// need to deploy a iam policy along with the binary
+// need to parse our policy structure to iam policy structure
+
 #[tokio::main]
 async fn main() -> Result<(), io::Error> {
     let account_id = "000000000000";
