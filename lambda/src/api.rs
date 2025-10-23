@@ -103,7 +103,6 @@ impl RestApiGateway {
     pub async fn http_get(&self, endpoint: &str) -> Result<(), Box<dyn std::error::Error>> {
         let client = HTTPClient::new();
 
-        // After creating deployment with stage "dev"
         let url = format!(
             "http://localhost:4566/restapis/{}/$default/_user_request_/{}",
             self.api_id, endpoint

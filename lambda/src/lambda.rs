@@ -39,7 +39,6 @@ impl LambdaClient {
         role_name: &str,
         function_name: &str,
         zipped_code_path: &std::path::Path,
-        _handler: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let role_arn = self.create_or_get_lambda_role(role_name).await?;
 

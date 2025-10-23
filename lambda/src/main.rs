@@ -9,7 +9,6 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> Result<(), io::Error> {
     let account_id = "000000000000";
-    let handler = "lambda_function.lambda_handler";
     let rolename = "test-rolename";
     let http_method = "GET";
 
@@ -49,7 +48,7 @@ async fn main() -> Result<(), io::Error> {
 
     // Deploy Lambda function (or update if function already exists) 
     let function_arn = lambda_client
-        .deploy_fn(rolename, &function_name, &zip_path, &handler)
+        .deploy_fn(rolename, &function_name, &zip_path)
         .await
         .expect("deploy lambda");
 
