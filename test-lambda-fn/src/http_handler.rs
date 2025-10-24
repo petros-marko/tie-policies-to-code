@@ -1,4 +1,5 @@
-use aws_sdk_s3::Client as S3Client;
+use aws_config::{BehaviorVersion, Region};
+use aws_sdk_s3::{config::{Builder, Credentials, SharedCredentialsProvider}, Client as S3Client};
 use lambda_http::{Body, Error, Request, RequestExt, Response};
 
 pub(crate) async fn function_handler(event: Request) -> Result<Response<Body>, Error> {

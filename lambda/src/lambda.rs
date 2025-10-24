@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::Path;
+
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_iam::Client as AwsIamClient;
 use aws_sdk_lambda::Client as AwsLambdaClient;
@@ -39,9 +42,9 @@ impl LambdaClient {
         role_name: &str,
         function_name: &str,
         zipped_code_path: &std::path::Path,
-        _policy_path: &std::path::Path,
+        policy_path: &std::path::Path,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        let role_arn = self.create_or_get_lambda_role(role_name).await?;
+        let role_arn = self.create_or_get_lambda_role(role_name, policy_path).await?;
 
         let creds = Credentials::new("test", "test", None, None, "test");
         let creds_provider = SharedCredentialsProvider::new(creds);
@@ -117,6 +120,7 @@ impl LambdaClient {
     async fn create_or_get_lambda_role(
         &self,
         role_name: &str,
+        policy_path: &Path
     ) -> Result<String, Box<dyn std::error::Error>> {
         let assume_role_policy = serde_json::json!({
             "Version": "2012-10-17",
@@ -128,6 +132,8 @@ impl LambdaClient {
                 "Action": "sts:AssumeRole"
             }]
         });
+
+        let policy_path_data = fs::read_to_string(policy_path)?;
 
         let create_role_result = self
             .iam_client
@@ -145,6 +151,15 @@ impl LambdaClient {
                     .attach_role_policy()
                     .role_name(role_name)
                     .policy_arn(policy_arn)
+                    .send()
+                    .await?;
+                // also attach specific user defined policy
+                println!("putting role policy");
+                self.iam_client
+                    .put_role_policy()
+                    .role_name(role_name)
+                    .policy_name("S3AccessPolicy")
+                    .policy_document(policy_path_data)
                     .send()
                     .await?;
                 res.role()

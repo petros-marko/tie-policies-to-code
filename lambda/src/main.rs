@@ -13,7 +13,7 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> Result<(), io::Error> {
     let account_id = "000000000000";
-    let rolename = "test-rolename";
+    let rolename = "test-rolename3";
     let http_method = "GET";
     let policy_path = Path::new("./test_policy.json");
 
