@@ -1,10 +1,10 @@
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_iam::Client as AwsIamClient;
+use aws_sdk_lambda::Client as AwsLambdaClient;
 use aws_sdk_lambda::config::Builder as LambdaBuilder;
 use aws_sdk_lambda::types::{Environment, FunctionCode, Runtime};
-use aws_sdk_lambda::Client as AwsLambdaClient;
-use aws_sdk_s3::config::Credentials;
-use aws_sdk_s3::config::SharedCredentialsProvider;
+use aws_sdk_s3::Client as S3Client;
+use aws_sdk_s3::config::{Builder, Credentials, SharedCredentialsProvider};
 
 pub struct LambdaClient {
     lambda_client: aws_sdk_lambda::Client,
@@ -39,12 +39,41 @@ impl LambdaClient {
         role_name: &str,
         function_name: &str,
         zipped_code_path: &std::path::Path,
+        _policy_path: &std::path::Path,
     ) -> Result<String, Box<dyn std::error::Error>> {
         let role_arn = self.create_or_get_lambda_role(role_name).await?;
 
-        let code_bytes = std::fs::read(zipped_code_path)?;
+        let creds = Credentials::new("test", "test", None, None, "test");
+        let creds_provider = SharedCredentialsProvider::new(creds);
+        let config = aws_config::SdkConfig::builder()
+            .behavior_version(BehaviorVersion::latest())
+            .endpoint_url("http://localhost:4566")
+            .credentials_provider(creds_provider)
+            .region(Region::new("us-east-1"))
+            .build();
+        let s3_config = Builder::from(&config).force_path_style(true).build();
+        let s3client = S3Client::from_conf(s3_config);
+
+        // put code in s3, because lambda will error if code file too big
+        let body =
+            aws_sdk_s3::primitives::ByteStream::from_path(std::path::Path::new(zipped_code_path))
+                .await;
+        let s3_put_result = s3client
+            .put_object()
+            .bucket("mhanlon-test")
+            .key("bootstrap2")
+            .body(body.unwrap())
+            .send()
+            .await
+            .map_err(aws_sdk_s3::Error::from);
+        let _ = match s3_put_result {
+            Err(err) => return Err(err.into()),
+            Ok(object) => object,
+        };
+
         let code = FunctionCode::builder()
-            .zip_file(code_bytes.clone().into())
+            .s3_bucket("mhanlon-test")
+            .s3_key("bootstrap2")
             .build();
 
         let create_function_result = self
@@ -71,14 +100,13 @@ impl LambdaClient {
                 if !service_err.is_resource_conflict_exception() {
                     return Err(service_err.into());
                 }
-                println!("Function with given name already deployed, nothing to do");
+                println!("Function with given name already deployed, just updating code");
                 self.lambda_client
-                    .get_function()
+                    .update_function_code()
                     .function_name(function_name)
                     .send()
                     .await?
-                    .configuration()
-                    .and_then(|r| r.function_arn())
+                    .function_arn()
                     .and_then(|r| Some(r.to_string()))
             }
         };

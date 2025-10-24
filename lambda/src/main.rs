@@ -15,6 +15,7 @@ async fn main() -> Result<(), io::Error> {
     let account_id = "000000000000";
     let rolename = "test-rolename";
     let http_method = "GET";
+    let policy_path = Path::new("./test_policy.json");
 
     let mut args = env::args().skip(1); // skip program name
 
@@ -52,7 +53,7 @@ async fn main() -> Result<(), io::Error> {
 
     // Deploy Lambda function (or update if function already exists) 
     let function_arn = lambda_client
-        .deploy_fn(rolename, &function_name, &zip_path)
+        .deploy_fn(rolename, &function_name, &zip_path, &policy_path)
         .await
         .expect("deploy lambda");
 

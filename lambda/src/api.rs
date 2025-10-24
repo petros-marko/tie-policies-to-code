@@ -110,7 +110,7 @@ impl RestApiGateway {
 
         let response = client
             .get(url)
-            .query(&[("name", "tie-policies-to-code")]) 
+            .query(&[("name", "michelina")]) 
             .header("Content-Type", "application/json")
             .header("headerName", "headerValue")
             .send()
