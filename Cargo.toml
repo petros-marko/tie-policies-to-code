@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 policy_macros = { path = "policy_macros" }
+lambda_macros = { path = "lambda_macros" }
 tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread"] }
 aws-config = "1.8.6"
 aws-sdk-s3 = "1.108.0"
