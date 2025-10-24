@@ -1,9 +1,10 @@
 use proc_macro::TokenStream;
 use serde::{Deserialize, Serialize};
+use syn::spanned::Spanned;
 use std::fs::{self, OpenOptions};
 use std::io::{Write};
 use std::path::Path;
-use syn::{parse_macro_input, ItemFn};
+use syn::{parse_macro_input, ItemFn, Error};
 
 mod parser;
 mod policy;
@@ -29,7 +30,20 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     // get existing policies
-    let policy_file = Path::new("./output/policies.json");
+    let crate_root = std::env::var("CARGO_MANIFEST_DIR");
+    if let Err(_) = crate_root {
+        return Error::new(func.span(), "Could not locate crate root").into_compile_error().into();
+    }
+    let crate_root = crate_root.unwrap();
+    let crate_root_path = Path::new(&crate_root);
+    let crate_bin_path = crate_root_path.join("policies");
+    if !crate_bin_path.exists() {
+        let create_dir_result = fs::create_dir(&crate_bin_path);
+        if let Err(_) = create_dir_result {
+            return Error::new(func.span(), "Could not create policy directory").into_compile_error().into();
+        }
+    }
+    let policy_file = crate_bin_path.join(format!("{}_policies.json", func_name));
     if let Some(parent) = policy_file.parent() {
        fs::create_dir_all(parent).expect("Failed to create output directory");
     }
@@ -40,11 +54,11 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     // update existing policy or add new one
-    if let Some(existing) = policies.iter_mut().find(|p| p.fn_name == policy_for_fn.fn_name) {
-        *existing = policy_for_fn.clone();
-    } else {
-        policies.push(policy_for_fn.clone());
-    }
+    // if let Some(existing) = policies.iter_mut().find(|p| p.fn_name == policy_for_fn.fn_name) {
+    //     *existing = policy_for_fn.clone();
+    // } else {
+    //     policies.push(policy_for_fn.clone());
+    // }
 
     // write back to file
     let json_content =

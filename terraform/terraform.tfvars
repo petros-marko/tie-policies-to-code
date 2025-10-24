@@ -1,0 +1,10 @@
+account_id        = "000000000000"
+role_name         = "test-rolename-terraform"
+function_name     = "my-lambda-function-terraform"
+api_name          = "my-new-api-terraform"
+api_path          = "test_func_terraform"
+http_method       = "GET"
+s3_bucket_name    = "my-code-bucket-terraform"
+s3_key            = "bootstrap"
+# generate a bootstrap.zip by running cargo lambda build --output-format=zip on a rust project
+lambda_code_path  = "./bootstrap.zip"
