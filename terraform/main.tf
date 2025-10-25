@@ -33,28 +33,8 @@ variable "account_id" {
   default     = "000000000000"
 }
 
-variable "role_name" {
-  description = "IAM Role name for Lambda function"
-  type        = string
-}
-
-variable "function_name" {
-  description = "Lambda function name"
-  type        = string
-}
-
 variable "api_name" {
   description = "API Gateway name"
-  type        = string
-}
-
-variable "api_path" {
-  description = "API Gateway path"
-  type        = string
-}
-
-variable "http_method" {
-  description = "HTTP method for the API endpoint"
   type        = string
 }
 
@@ -63,37 +43,45 @@ variable "s3_bucket_name" {
   type        = string
 }
 
-variable "s3_key" {
-  description = "S3 key for Lambda code"
-  type        = string
-}
-
-variable "lambda_code_path" {
-  description = "Local path to the Lambda function code zip file"
-  type        = string
+variable "lambda_functions" {
+  description = "List of Lambda functions to deploy"
+  type = list(object({
+    name        = string
+    code_path   = string
+    s3_key      = string
+    api_path    = string
+    http_method = string
+    policy_document = string  # JSON policy document (can be inline JSON or file path)
+  }))
 }
 
 # S3 bucket for Lambda code
 resource "aws_s3_bucket" "lambda_code_bucket" {
-  bucket = var.s3_bucket_name 
+  bucket = var.s3_bucket_name
 }
 
-# Upload Lambda code to S3
+# API Gateway REST API
+resource "aws_api_gateway_rest_api" "main" {
+  name = var.api_name
+}
+
+# Upload multiple Lambda code files to S3
 resource "aws_s3_object" "lambda_code" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
   bucket = aws_s3_bucket.lambda_code_bucket.id
-  key    = var.s3_key
-  source = var.lambda_code_path
+  key    = each.value.s3_key
+  source = each.value.code_path
   
-  # This ensures the Lambda function is updated when the code changes
-  etag = filemd5(var.lambda_code_path)
-  
-  # LocalStack specific configuration
-  force_destroy = true
+  # to detect code changes
+  etag = filemd5(each.value.code_path)
 }
 
-# IAM Role for Lambda function
-resource "aws_iam_role" "lambda_role" {
-  name = var.role_name
+# IAM roles for each Lambda function
+resource "aws_iam_role" "function_roles" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
+  name = "${each.value.name}-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -109,44 +97,35 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# AWS managed policy for basic Lambda execution
-resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
-  role       = aws_iam_role.lambda_role.name
+# Attach basic execution policy to each function role
+resource "aws_iam_role_policy_attachment" "function_basic_execution" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
+  role       = aws_iam_role.function_roles[each.key].name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# Custom S3 access policy for Lambda function
-resource "aws_iam_role_policy" "s3_access_policy" {
-  name = "S3AccessPolicy"
-  role = aws_iam_role.lambda_role.id
+# create indiviual custom policies for each function (from the policy file)
+resource "aws_iam_role_policy" "function_policies" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
+  name = "${each.value.name}-policy"
+  role = aws_iam_role.function_roles[each.key].id
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "ExampleStmt"
-        Action = [
-          "s3:GetObject"
-        ]
-        Effect = "Allow"
-        Resource = [
-          "arn:aws:s3:::${var.s3_bucket_name}/*"
-        ]
-      }
-    ]
-  })
+  policy = fileexists(each.value.policy_document) ? file(each.value.policy_document) : each.value.policy_document
 }
 
-resource "aws_lambda_function" "main" {
-  function_name = var.function_name
-  role          = aws_iam_role.lambda_role.arn
+resource "aws_lambda_function" "functions" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
+  function_name = each.value.name
+  role          = aws_iam_role.function_roles[each.key].arn
   handler       = "bootstrap"
   runtime       = "provided.al2023"
   timeout       = 30
 
-  # Code from S3 
   s3_bucket = var.s3_bucket_name
-  s3_key    = var.s3_key
+  s3_key    = each.value.s3_key
 
   environment {
     variables = {
@@ -155,72 +134,80 @@ resource "aws_lambda_function" "main" {
   }
 
   depends_on = [
-    aws_iam_role_policy_attachment.lambda_basic_execution,
-    aws_iam_role_policy.s3_access_policy,
+    aws_iam_role_policy_attachment.function_basic_execution,
+    aws_iam_role_policy.function_policies,
     aws_s3_object.lambda_code
   ]
 }
 
-# API Gateway REST API 
-resource "aws_api_gateway_rest_api" "main" {
-  name = var.api_name
-}
-
-# API Gateway Resource
-resource "aws_api_gateway_resource" "main" {
+# API Gateway resources
+resource "aws_api_gateway_resource" "function_resources" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
   rest_api_id = aws_api_gateway_rest_api.main.id
   parent_id   = aws_api_gateway_rest_api.main.root_resource_id
-  path_part   = var.api_path
+  path_part   = each.value.api_path
 }
 
-# API Gateway Method
-resource "aws_api_gateway_method" "main" {
+# API Gateway methods
+resource "aws_api_gateway_method" "function_methods" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
   rest_api_id   = aws_api_gateway_rest_api.main.id
-  resource_id   = aws_api_gateway_resource.main.id
-  http_method   = var.http_method
+  resource_id   = aws_api_gateway_resource.function_resources[each.key].id
+  http_method   = each.value.http_method
   authorization = "NONE"
 }
 
-# API Gateway Integration
-resource "aws_api_gateway_integration" "main" {
+# API Gateway integrations
+resource "aws_api_gateway_integration" "function_integrations" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
   rest_api_id = aws_api_gateway_rest_api.main.id
-  resource_id = aws_api_gateway_resource.main.id
-  http_method = aws_api_gateway_method.main.http_method
+  resource_id = aws_api_gateway_resource.function_resources[each.key].id
+  http_method = aws_api_gateway_method.function_methods[each.key].http_method
 
   integration_http_method = "POST"
   type                   = "AWS_PROXY"
-  uri                    = aws_lambda_function.main.invoke_arn
+  uri                    = aws_lambda_function.functions[each.key].invoke_arn
 }
 
-# API Gateway Deployment
+# Lambda permissions
+resource "aws_lambda_permission" "function_permissions" {
+  for_each = { for func in var.lambda_functions : func.name => func }
+  
+  statement_id  = "AllowExecutionFromAPIGateway-${each.key}"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.functions[each.key].function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}
+
+# Update deployment to depend on all integrations
 resource "aws_api_gateway_deployment" "main" {
   depends_on = [
-    aws_api_gateway_integration.main
+    aws_api_gateway_integration.function_integrations
   ]
 
   rest_api_id = aws_api_gateway_rest_api.main.id
   stage_name  = "$default"
 }
 
-# Lambda Permission for API Gateway
-resource "aws_lambda_permission" "api_gateway" {
-  statement_id  = "AllowExecutionFromAPIGateway"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.main.function_name
-  principal     = "apigateway.amazonaws.com"
-  # two * are for any stage, and any HTTP method
-  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
-}
-
 # Outputs
-output "api_gateway_url" {
-  description = "URL of the API Gateway"
-  value       = "http://localhost:4566/restapis/${aws_api_gateway_rest_api.main.id}/$default/_user_request_/${var.api_path}"
+output "function_urls" {
+  description = "URLs for all Lambda functions"
+  value = {
+    for func in var.lambda_functions : func.name => 
+    "http://localhost:4566/restapis/${aws_api_gateway_rest_api.main.id}/$default/_user_request_/${func.api_path}"
+  }
 }
 
-output "lambda_function_arn" {
-  description = "ARN of the Lambda function"
-  value       = aws_lambda_function.main.arn
+output "function_arns" {
+  description = "ARNs of all Lambda functions"
+  value = {
+    for func in var.lambda_functions : func.name => 
+    aws_lambda_function.functions[func.name].arn
+  }
 }
 
 output "api_gateway_id" {
