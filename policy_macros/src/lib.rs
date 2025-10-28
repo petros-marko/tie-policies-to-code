@@ -24,10 +24,6 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
     let func_name = func.sig.ident.to_string();
 
     let policy = parse_macro_input!(attr as policy::Policy);
-    let policy_for_fn = PolicyForFn {
-        policy: policy,
-        fn_name: func_name.clone(),
-    };
 
     // get existing policies
     let crate_root = std::env::var("CARGO_MANIFEST_DIR");
@@ -36,6 +32,7 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
     let crate_root = crate_root.unwrap();
     let crate_root_path = Path::new(&crate_root);
+    println!("crate_root_path: {}", crate_root_path.display());
     let crate_bin_path = crate_root_path.join("policies");
     if !crate_bin_path.exists() {
         let create_dir_result = fs::create_dir(&crate_bin_path);
@@ -43,11 +40,11 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
             return Error::new(func.span(), "Could not create policy directory").into_compile_error().into();
         }
     }
-    let policy_file = crate_bin_path.join(format!("{}_policies.json", func_name));
+    let policy_file = crate_bin_path.join(format!("{}.json", func_name));
     if let Some(parent) = policy_file.parent() {
        fs::create_dir_all(parent).expect("Failed to create output directory");
     }
-    let mut policies: Vec<PolicyForFn> = vec![];
+    let mut policies: Vec<policy::Policy> = vec![];
     if policy_file.exists() {
         let content = fs::read_to_string(&policy_file).unwrap_or_else(|_| "[]".to_string());
         policies = serde_json::from_str(&content).unwrap_or_else(|_| vec![])
