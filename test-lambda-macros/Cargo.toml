@@ -1,0 +1,12 @@
+[package]
+name = "test-lambda-macros"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lambda_http = "0.13.0"
+lambda_macros = { path = "../lambda_macros" }
+policy_macros = { path = "../policy_macros" }
+
+tokio = { version = "1", features = ["macros"] }
+lambda_runtime = "0.13.0"
