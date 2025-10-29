@@ -126,7 +126,6 @@ fn generate_terraform(crate_root: &str, func_name: &str, lambda: &lambda::Lambda
     Ok(())
 }
 
-
 fn create_bin_and_add_dependencies(crate_root: String, lambda: lambda::Lambda, func: ItemFn) -> Result<(), io::Error> {
     let func_name = func.sig.ident.to_string();
     add_dependencies(&crate_root);
