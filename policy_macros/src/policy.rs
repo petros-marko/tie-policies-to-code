@@ -41,9 +41,9 @@ impl FromStr for Action {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Policy {
-    effect: Effect,
-    action: Action,
-    resource: String,
+    pub effect: Effect,
+    pub action: Action,
+    pub resource: String,
 }
 
 impl Policy {

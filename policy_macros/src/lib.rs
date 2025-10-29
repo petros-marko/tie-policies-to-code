@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use serde::{Deserialize, Serialize};
+use serde_json::json;
 use syn::spanned::Spanned;
 use std::fs::{self, OpenOptions};
 use std::io::{Write};
@@ -8,13 +8,6 @@ use syn::{parse_macro_input, ItemFn, Error};
 
 mod parser;
 mod policy;
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct PolicyForFn {
-    policy: policy::Policy,
-    fn_name: String,
-    // maybe some hash of fn body?
-}
 
 #[proc_macro_attribute]
 pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -26,21 +19,20 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
     let policy = parse_macro_input!(attr as policy::Policy);
 
     // get existing policies
-    let crate_root = std::env::var("CARGO_MANIFEST_DIR");
-    if let Err(_) = crate_root {
+    let crate_root_res = std::env::var("CARGO_MANIFEST_DIR");
+    if let Err(_) = crate_root_res {
         return Error::new(func.span(), "Could not locate crate root").into_compile_error().into();
     }
-    let crate_root = crate_root.unwrap();
+    let crate_root = crate_root_res.unwrap();
     let crate_root_path = Path::new(&crate_root);
-    println!("crate_root_path: {}", crate_root_path.display());
-    let crate_bin_path = crate_root_path.join("policies");
-    if !crate_bin_path.exists() {
-        let create_dir_result = fs::create_dir(&crate_bin_path);
+    let crate_policies_path = crate_root_path.join("policies");
+    if !crate_policies_path.exists() {
+        let create_dir_result = fs::create_dir(&crate_policies_path);
         if let Err(_) = create_dir_result {
-            return Error::new(func.span(), "Could not create policy directory").into_compile_error().into();
+            return Error::new(func.span(), "Could not create policies directory").into_compile_error().into();
         }
     }
-    let policy_file = crate_bin_path.join(format!("{}.json", func_name));
+    let policy_file = crate_policies_path.join(format!("{}.json", func_name));
     if let Some(parent) = policy_file.parent() {
        fs::create_dir_all(parent).expect("Failed to create output directory");
     }
@@ -50,16 +42,30 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
         policies = serde_json::from_str(&content).unwrap_or_else(|_| vec![])
     };
 
-    // update existing policy or add new one
-    // if let Some(existing) = policies.iter_mut().find(|p| p.fn_name == policy_for_fn.fn_name) {
-    //     *existing = policy_for_fn.clone();
-    // } else {
-    //     policies.push(policy_for_fn.clone());
-    // }
+    policies.push(policy.clone());
 
-    // write back to file
+    // convert policies to iam json
+    let iam_json = json!({
+        "Version": "2012-10-17",
+        "Statement": policies.iter().map(|p| json!({
+            "Sid": func_name,
+            "Effect": match p.effect {
+                policy::Effect::Allow => "Allow",
+                policy::Effect::Deny => "Deny",
+            },
+            "Action": match p.action {
+                policy::Action::Get => "s3:GetObject",
+                policy::Action::Post => "s3:PutObject",
+                policy::Action::Put => "s3:PutObject",
+                policy::Action::Delete => "s3:DeleteObject",
+            },
+            "Resource": format!("arn:aws:s3:::{}", p.resource)
+        })).collect::<Vec<_>>()
+    });
+
+    // write back to file as iam json
     let json_content =
-        serde_json::to_string_pretty(&policies).expect("Failed to serialize policies");
+        serde_json::to_string_pretty(&iam_json).expect("Failed to serialize policies");
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
