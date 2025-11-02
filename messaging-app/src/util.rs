@@ -1,11 +1,12 @@
 use crate::data_model::{
     CreationResult, DeletionResult, Friendship, FriendshipStatus, Message, Profile,
-    UpdateProfileRequest, UpdateResult,
+    UpdateProfileRequest, UpdateResult, UsersFriendsOrIdentical,
 };
 use aws_sdk_dynamodb::error::SdkError;
 use aws_sdk_dynamodb::operation::update_item::UpdateItemError;
 use aws_sdk_dynamodb::types::{AttributeValue, ReturnValue};
 use aws_sdk_dynamodb::{Client, operation::put_item::PutItemError};
+use chrono::prelude::Utc;
 use itertools::Itertools;
 use serde_dynamo::aws_sdk_dynamodb_1;
 use std::collections::HashMap;
@@ -17,6 +18,33 @@ pub(crate) fn conversation_id(user_id1: &str, user_id2: &str) -> String {
         (user_id2, user_id1)
     };
     format!("CONVERSATION#{}#{}", min_id, max_id)
+}
+
+pub(crate) async fn send_message(
+    client: &Client,
+    table_name: &str,
+    user_a: &str,
+    user_b: &str,
+    text: &str,
+) -> Result<CreationResult, Box<dyn std::error::Error + Send + Sync>> {
+    let convo_id = conversation_id(user_a, user_b);
+    let msg_id = format!("MSG#{}", Utc::now());
+    client
+        .put_item()
+        .table_name(table_name)
+        .item("PK", AttributeValue::S(convo_id))
+        .item("SK", AttributeValue::S(msg_id))
+        .item("sender_id", AttributeValue::S(user_a.to_string()))
+        .item(
+            "content",
+            AttributeValue::M(HashMap::from([(
+                "text".to_string(),
+                AttributeValue::S(text.to_string()),
+            )])),
+        )
+        .send()
+        .await?;
+    Ok(CreationResult::Success)
 }
 
 pub(crate) async fn get_conversation(
@@ -44,6 +72,30 @@ pub(crate) async fn get_conversation(
     Ok(messages)
 }
 
+pub(crate) async fn get_latest_message(
+    client: &Client,
+    table_name: &str,
+    user_a: &str,
+    user_b: &str,
+) -> Result<Option<Message>, Box<dyn std::error::Error + Send + Sync>> {
+    let convo_id = conversation_id(user_a, user_b);
+    let resp = client
+        .query()
+        .table_name(table_name)
+        .key_condition_expression("PK = :pk AND begins_with(SK, :msg)")
+        .expression_attribute_values(":pk", AttributeValue::S(convo_id))
+        .expression_attribute_values(":msg", AttributeValue::S("MSG#".to_string()))
+        .scan_index_forward(false)
+        .limit(1)
+        .send()
+        .await?;
+    let message = match resp.items().first() {
+        Some(item) => aws_sdk_dynamodb_1::from_item(item.clone())?,
+        None => None,
+    };
+    Ok(message)
+}
+
 fn user_id(id: &str) -> String {
     format!("USER#{id}")
 }
@@ -53,9 +105,9 @@ pub(crate) async fn users_are_friends_or_identical(
     table_name: &str,
     user_a: &str,
     user_b: &str,
-) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<UsersFriendsOrIdentical, Box<dyn std::error::Error + Send + Sync>> {
     if user_a == user_b {
-        Ok(true)
+        Ok(UsersFriendsOrIdentical::Identical)
     } else {
         let resp = client
             .query()
@@ -67,10 +119,13 @@ pub(crate) async fn users_are_friends_or_identical(
             .await?;
         let mut items = resp.items().to_vec();
         if items.is_empty() {
-            Ok(false)
+            Ok(UsersFriendsOrIdentical::Unrelated)
         } else {
             let friendship: Friendship = aws_sdk_dynamodb_1::from_item(items.pop().unwrap())?;
-            Ok(matches!(friendship.status, FriendshipStatus::Accepted))
+            Ok(match friendship.status {
+                FriendshipStatus::Accepted => UsersFriendsOrIdentical::Friends,
+                FriendshipStatus::Pending => UsersFriendsOrIdentical::Unrelated,
+            })
         }
     }
 }
@@ -224,7 +279,10 @@ pub(crate) async fn accept_friendship(
     user_a: &str,
     user_b: &str,
 ) -> Result<UpdateResult<Friendship>, Box<dyn std::error::Error + Send + Sync>> {
-    if users_are_friends_or_identical(client, table_name, user_a, user_b).await? {
+    if !matches!(
+        users_are_friends_or_identical(client, table_name, user_a, user_b).await?,
+        UsersFriendsOrIdentical::Unrelated
+    ) {
         Ok(UpdateResult::EmptyUpdate)
     } else {
         if friend_request_exists(client, table_name, user_b, user_a).await? {

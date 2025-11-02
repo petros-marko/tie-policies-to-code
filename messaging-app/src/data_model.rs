@@ -1,9 +1,21 @@
+use aws_sdk_dynamodb::Client;
 use serde::{Deserialize, Serialize};
+
+pub struct AppState {
+    pub db: Client,
+    pub user_table_name: String,
+    pub message_table_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MessageContent {
+    pub text: String,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Message {
     pub sender_id: String,
-    pub text: String,
+    pub content: MessageContent,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -43,4 +55,10 @@ pub enum UpdateResult<T: Serialize + for<'a> Deserialize<'a>> {
     Success(T),
     EmptyUpdate,
     NotFound,
+}
+
+pub enum UsersFriendsOrIdentical {
+    Friends,
+    Identical,
+    Unrelated,
 }
