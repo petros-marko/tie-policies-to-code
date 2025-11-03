@@ -371,3 +371,41 @@ pub(crate) async fn delete_friendship(
         Ok(DeletionResult::NotFound)
     }
 }
+
+pub async fn create_dynamo_table(client: Client, name: String) -> anyhow::Result<()> {
+    let tables = client.list_tables().send().await.unwrap();
+    if !tables.table_names().contains(&name) {
+        let ad_pk = aws_sdk_dynamodb::types::AttributeDefinition::builder()
+            .attribute_name(String::from("PK"))
+            .attribute_type(aws_sdk_dynamodb::types::ScalarAttributeType::S)
+            .build()?;
+
+        let ks_pk = aws_sdk_dynamodb::types::KeySchemaElement::builder()
+            .attribute_name(String::from("PK"))
+            .key_type(aws_sdk_dynamodb::types::KeyType::Hash)
+            .build()?;
+
+        let ad_sk = aws_sdk_dynamodb::types::AttributeDefinition::builder()
+            .attribute_name(String::from("SK"))
+            .attribute_type(aws_sdk_dynamodb::types::ScalarAttributeType::S)
+            .build()?;
+
+        let ks_sk = aws_sdk_dynamodb::types::KeySchemaElement::builder()
+            .attribute_name(String::from("SK"))
+            .key_type(aws_sdk_dynamodb::types::KeyType::Range)
+            .build()?;
+
+        client
+            .create_table()
+            .table_name(String::from(name))
+            .attribute_definitions(ad_pk)
+            .key_schema(ks_pk)
+            .attribute_definitions(ad_sk)
+            .key_schema(ks_sk)
+            .billing_mode(aws_sdk_dynamodb::types::BillingMode::PayPerRequest)
+            .send()
+            .await?;
+    }
+
+    Ok(())
+}

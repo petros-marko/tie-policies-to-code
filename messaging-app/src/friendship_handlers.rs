@@ -1,3 +1,4 @@
+use crate::auth::AuthUser;
 use crate::data_model::{AppState, CreationResult, DeletionResult, UpdateResult};
 use crate::util;
 use axum::{
@@ -9,12 +10,13 @@ use axum::{
 use std::sync::Arc;
 
 pub(crate) async fn create_friendship(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
-    match util::create_friendship(&state.db, &state.user_table_name, my_user_id, &user_id).await {
+    // let my_user_id = "123";
+    match util::create_friendship(&state.db, &state.user_table_name, &claims.sub.strip_prefix("auth0|").unwrap(), &user_id).await {
         Ok(CreationResult::Success) => (
             StatusCode::CREATED,
             Json(serde_json::json!({ "status" : "ok" })),
@@ -34,12 +36,13 @@ pub(crate) async fn create_friendship(
 }
 
 pub(crate) async fn accept_friendship(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
-    match util::accept_friendship(&state.db, &state.user_table_name, my_user_id, &user_id).await {
+    // let my_user_id = "123";
+    match util::accept_friendship(&state.db, &state.user_table_name, &claims.sub.strip_prefix("auth0|").unwrap(), &user_id).await {
         Ok(UpdateResult::Success(friendship)) => (StatusCode::OK, Json(friendship)).into_response(),
         Ok(UpdateResult::EmptyUpdate) => (
             StatusCode::BAD_REQUEST,
@@ -60,12 +63,13 @@ pub(crate) async fn accept_friendship(
 }
 
 pub(crate) async fn delete_friendship(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
-    match util::delete_friendship(&state.db, &state.user_table_name, my_user_id, &user_id).await {
+    // let my_user_id = "123";
+    match util::delete_friendship(&state.db, &state.user_table_name, &claims.sub.strip_prefix("auth0|").unwrap(), &user_id).await {
         Ok(DeletionResult::Success) => (
             StatusCode::NO_CONTENT,
             Json(serde_json::json!({ "status" : "deleted" })),

@@ -1,10 +1,14 @@
 use aws_sdk_dynamodb::Client;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use jsonwebtoken::jwk::JwkSet;
 
+#[derive(Clone)]
 pub struct AppState {
     pub db: Client,
     pub user_table_name: String,
     pub message_table_name: String,
+    pub jwks: Arc<JwkSet>
 }
 
 #[derive(Debug, Serialize, Deserialize)]

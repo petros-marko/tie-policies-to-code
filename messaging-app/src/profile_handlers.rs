@@ -1,3 +1,4 @@
+use crate::auth::AuthUser;
 use crate::data_model::{
     AppState, CreationResult, Profile, UpdateProfileRequest, UpdateResult, UsersFriendsOrIdentical,
 };
@@ -11,13 +12,14 @@ use axum::{
 use std::sync::Arc;
 
 pub(crate) async fn create_profile(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
     Json(profile): Json<Profile>,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
-    if my_user_id == user_id {
+    // let my_user_id = "123";
+    if claims.sub.strip_prefix("auth0|").unwrap() == user_id {
         let result =
             util::create_profile(&state.db, &state.user_table_name, &user_id, profile).await;
         match result {
@@ -47,13 +49,14 @@ pub(crate) async fn create_profile(
 }
 
 pub(crate) async fn update_profile(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
     Json(update_profile_request): Json<UpdateProfileRequest>,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
-    if my_user_id == user_id {
+    // let my_user_id = "123";
+    if claims.sub.strip_prefix("auth0|").unwrap() == user_id {
         match util::update_profile(
             &state.db,
             &state.user_table_name,
@@ -87,15 +90,16 @@ pub(crate) async fn update_profile(
 }
 
 pub(crate) async fn get_profile(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
+    // let my_user_id = "123";
     match util::users_are_friends_or_identical(
         &state.db,
         &state.user_table_name,
-        my_user_id,
+        &claims.sub.strip_prefix("auth0|").unwrap(),
         &user_id,
     )
     .await

@@ -1,3 +1,4 @@
+use crate::auth::AuthUser;
 use crate::data_model::{AppState, MessageContent, UsersFriendsOrIdentical};
 use crate::util;
 use axum::{
@@ -9,16 +10,17 @@ use axum::{
 use std::sync::Arc;
 
 pub(crate) async fn send_message(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
     Json(message_content): Json<MessageContent>,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
+    // let my_user_id = "123";
     let friends_or_identical = util::users_are_friends_or_identical(
         &state.db,
         &state.user_table_name,
-        my_user_id,
+        &claims.sub.strip_prefix("auth0|").unwrap(),
         &user_id,
     )
     .await;
@@ -36,7 +38,7 @@ pub(crate) async fn send_message(
         UsersFriendsOrIdentical::Friends => match util::send_message(
             &state.db,
             &state.message_table_name,
-            my_user_id,
+            &claims.sub.strip_prefix("auth0|").unwrap(),
             &user_id,
             &message_content.text,
         )
@@ -62,13 +64,14 @@ pub(crate) async fn send_message(
 }
 
 pub(crate) async fn get_conversation(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
+    // let my_user_id = "123";
     let messages =
-        util::get_conversation(&state.db, &state.message_table_name, my_user_id, &user_id).await;
+        util::get_conversation(&state.db, &state.message_table_name, &claims.sub.strip_prefix("auth0|").unwrap(), &user_id).await;
     match messages {
         Ok(messages) => Json(messages).into_response(),
         Err(err) => (
@@ -80,13 +83,14 @@ pub(crate) async fn get_conversation(
 }
 
 pub(crate) async fn get_latest_message(
-    Path(user_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Path(user_id): Path<String>,
+    AuthUser {claims}: AuthUser,
 ) -> impl IntoResponse {
     // This should be pulled out of the request
-    let my_user_id = "123";
+    // let my_user_id = "123";
     let message =
-        util::get_latest_message(&state.db, &state.message_table_name, my_user_id, &user_id).await;
+        util::get_latest_message(&state.db, &state.message_table_name, &claims.sub.strip_prefix("auth0|").unwrap(), &user_id).await;
     match message {
         Ok(Some(message)) => (StatusCode::OK, Json(message)).into_response(),
         Ok(None) => (

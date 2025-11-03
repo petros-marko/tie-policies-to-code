@@ -1,4 +1,4 @@
-use crate::data_model::AppState;
+use crate::{data_model::AppState, util::create_dynamo_table};
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_dynamodb::{
     Client,
@@ -14,9 +14,11 @@ mod data_model;
 mod friendship_handlers;
 mod profile_handlers;
 mod util;
+mod auth;
 
 #[tokio::main]
 async fn main() {
+    // create dynamodb client
     let creds = Credentials::new("test", "test", None, None, "test");
     let creds_provider = SharedCredentialsProvider::new(creds);
     let config = aws_config::SdkConfig::builder()
@@ -26,12 +28,22 @@ async fn main() {
         .region(Region::new("us-east-1"))
         .build();
     let db = Client::new(&config);
+
+    // create dynamodb tables
+    create_dynamo_table(db.clone(), String::from("Users")).await.unwrap();
+    create_dynamo_table(db.clone(), String::from("Messages")).await.unwrap();
+
+    // create app state with db and token map
+    let jwks = auth::fetch_jwks().await.unwrap();
+
     let state = Arc::new(AppState {
         db,
         user_table_name: "Users".to_string(),
         message_table_name: "Messages".to_string(),
+        jwks: Arc::new(jwks),
     });
-    // build our application with a single route
+
+    // build application routes
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .route("/profile/{user_id}", post(profile_handlers::create_profile))
@@ -63,7 +75,7 @@ async fn main() {
         )
         .with_state(state);
 
-    // run our app with hyper, listening globally on port 3000
+    // run app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
