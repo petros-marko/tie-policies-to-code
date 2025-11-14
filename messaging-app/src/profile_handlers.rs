@@ -11,6 +11,11 @@ use axum::{
 };
 use std::sync::Arc;
 
+// #[policy(
+// allow dynamodb:Query on dynamodb:Users
+// with attributes ["full_name", "email"]
+// where equals($pk, "USER#$user_id")
+// )]
 pub(crate) async fn create_profile(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,
