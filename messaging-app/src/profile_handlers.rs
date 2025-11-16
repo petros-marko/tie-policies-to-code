@@ -10,6 +10,7 @@ use axum::{
     response::IntoResponse,
 };
 use std::sync::Arc;
+use policy_macros;
 
 // #[policy(
 // allow dynamodb:Query on dynamodb:Users
@@ -94,6 +95,12 @@ pub(crate) async fn update_profile(
     }
 }
 
+#[policy_macros::policy_attr(
+    allow read on table "Users" 
+        where key_like $pk "USER#*"
+        where key_equals $sk "PROFILE"
+        with attributes ["full_name" "email"]
+)]
 pub(crate) async fn get_profile(
     State(state): State<Arc<AppState>>,
     Path(user_id): Path<String>,

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+policy_macros = { path = "../policy_macros" }
 aws-config = "1.8.8"
 aws-sdk-dynamodb = "1.96.0"
 axum = "0.8.6"

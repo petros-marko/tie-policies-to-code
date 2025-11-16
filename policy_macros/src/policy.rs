@@ -1,58 +1,50 @@
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub enum Effect {
-    Allow,
-    Deny,
-}
-
-impl FromStr for Effect {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "allow" => Ok(Effect::Allow),
-            "deny" => Ok(Effect::Deny),
-            s => Err(format!("Invalid effect: {}", s)),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Action {
-    Get,
-    Post,
-    Put,
-    Delete
-}
-
-impl FromStr for Action {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "get" => Ok(Action::Get),
-            "post" => Ok(Action::Post),
-            "put" => Ok(Action::Put),
-            "delete" => Ok(Action::Delete),
-            s => Err(format!("Invalid action: {}", s)),
-        }
-    }
+    Create, Read, Update, Delete
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Policy {
-    pub effect: Effect,
+pub enum Resource {
+    Table(String)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Key {
+    Pk,
+    Sk,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Var(pub Vec<String>);
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum StringExpr {
+    Literal(String),
+    Variable(Var),
+    Concat(Box<StringExpr>, Box<StringExpr>)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Filter {
+    KeyEquals(Key, StringExpr),
+    KeyLike(Key, StringExpr)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Field(pub String);
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PolicyAtom {
     pub action: Action,
-    pub resource: String,
+    pub resource: Resource,
+    pub filters: Vec<Filter>,
+    pub attributes: Option<Vec<Field>>
 }
 
-impl Policy {
-    pub fn new(effect: Effect, action: Action, resource: String) -> Self {
-        Self {
-            effect,
-            action,
-            resource
-        }
-    }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Policy {
+    Atom(PolicyAtom),
+    Composite(Vec<PolicyAtom>)
 }
-

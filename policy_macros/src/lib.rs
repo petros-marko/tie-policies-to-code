@@ -1,3 +1,8 @@
+mod parser;
+mod policy;
+mod compiler;
+mod iam_policy_compiler;
+
 use proc_macro::TokenStream;
 use serde_json::json;
 use syn::spanned::Spanned;
@@ -6,8 +11,8 @@ use std::io::{Write};
 use std::path::Path;
 use syn::{parse_macro_input, ItemFn, Error};
 
-mod parser;
-mod policy;
+use compiler::PolicyCompiler;
+use iam_policy_compiler::IamPolicyCompiler;
 
 #[proc_macro_attribute]
 pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -44,35 +49,19 @@ pub fn policy_attr(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     policies.push(policy.clone());
 
-    // convert policies to iam json
-    let iam_json = json!({
-        "Version": "2012-10-17",
-        "Statement": policies.iter().map(|p| json!({
-            "Sid": func_name,
-            "Effect": match p.effect {
-                policy::Effect::Allow => "Allow",
-                policy::Effect::Deny => "Deny",
-            },
-            "Action": match p.action {
-                policy::Action::Get => "s3:GetObject",
-                policy::Action::Post => "s3:PutObject",
-                policy::Action::Put => "s3:PutObject",
-                policy::Action::Delete => "s3:DeleteObject",
-            },
-            "Resource": format!("arn:aws:s3:::{}", p.resource)
-        })).collect::<Vec<_>>()
-    });
+    let compiler = IamPolicyCompiler {};
+    let iam_json = compiler.compile_policy(&policy);
 
     // write back to file as iam json
     let json_content =
         serde_json::to_string_pretty(&iam_json).expect("Failed to serialize policies");
+        
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
         .open(&policy_file)
         .expect("Failed to open file");
     file.write_all(json_content.as_bytes()).expect("Failed to write to file");
-
     // Return function unchanged
     return item;
 }

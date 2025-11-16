@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_s3::config::{Credentials, SharedCredentialsProvider, Builder};
 use aws_config::{BehaviorVersion, Region};
-use policy_macros;
 
 pub async fn get_s3_client() -> S3Client {
     let creds = Credentials::new("test", "test", None, None, "test");
@@ -42,7 +41,6 @@ pub async fn create_bucket(
     })
 }
 
-#[policy_macros::policy_attr(allow post mybucket)]
 pub async fn upload_object(
     client: &aws_sdk_s3::Client,
     bucket_name: &str,
@@ -60,7 +58,6 @@ pub async fn upload_object(
         .map_err(aws_sdk_s3::Error::from)
 }
 
-#[policy_macros::policy_attr(allow get mybucket)]
 pub async fn download_object(
     client: &aws_sdk_s3::Client,
     bucket_name: &str,

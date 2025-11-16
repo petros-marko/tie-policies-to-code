@@ -3,6 +3,16 @@ name = "tie-policies-to-code"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = [
+    "lambda",
+    "lambda_macros",
+    "policy_macros",
+    "messaging-app",
+    "test-lambda-fn",
+    "test-lambda-macros",
+]
+
 [dependencies]
 policy_macros = { path = "policy_macros" }
 lambda_macros = { path = "lambda_macros" }
