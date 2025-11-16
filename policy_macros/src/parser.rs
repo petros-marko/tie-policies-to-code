@@ -73,7 +73,6 @@ impl Parse for StringExpr {
         }
 
         if input.peek(Token![$]) {
-            input.parse::<Token![$]>()?;
             let var = input.parse::<Var>()?;
             return Ok(StringExpr::Variable(var));
         }
